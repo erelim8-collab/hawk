@@ -239,7 +239,7 @@
             background: var(--bg-secondary);
             padding: 32px;
             border-radius: 32px;
-            width: 360px;
+            width: 400px;
             max-width: 90%;
             box-shadow: var(--shadow);
             border: 1px solid var(--border-color);
@@ -1014,6 +1014,29 @@
         .hidden {
             display: none !important;
         }
+
+        /* Чекбоксы в модальном окне */
+        .user-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        .user-checkbox-item:last-child {
+            border-bottom: none;
+        }
+        .user-checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        .user-checkbox-item label {
+            flex: 1;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -1046,6 +1069,18 @@
                 <input type="password" id="adminPasswordInput" placeholder="Пароль администратора">
                 <button id="adminPasswordSubmit"><i class="fas fa-key"></i> Войти</button>
                 <button id="adminPasswordCancel"><i class="fas fa-times"></i> Отмена</button>
+            </div>
+        </div>
+
+        <!-- Модальное окно для создания чата (с выбором участников) -->
+        <div id="createChatModal" class="modal hidden">
+            <div class="modal-content">
+                <h3><i class="fas fa-plus-circle"></i> Создать чат</h3>
+                <input type="text" id="newChatNameInput" class="login-input" placeholder="Название чата">
+                <div style="color: var(--text-secondary); margin-bottom: 10px;">Выберите участников:</div>
+                <div id="newChatUsersList" style="max-height: 250px; overflow-y: auto; background: var(--bg-input); border-radius: 16px; padding: 10px; margin-bottom: 20px;"></div>
+                <button id="createChatConfirm" class="login-btn"><i class="fas fa-check"></i> Создать</button>
+                <button id="createChatCancel" class="login-btn" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary);"><i class="fas fa-times"></i> Отмена</button>
             </div>
         </div>
 
@@ -1374,6 +1409,13 @@
             const adminPasswordSubmit = document.getElementById('adminPasswordSubmit');
             const adminPasswordCancel = document.getElementById('adminPasswordCancel');
 
+            // Элементы для модального окна создания чата
+            const createChatModal = document.getElementById('createChatModal');
+            const newChatNameInput = document.getElementById('newChatNameInput');
+            const newChatUsersList = document.getElementById('newChatUsersList');
+            const createChatConfirm = document.getElementById('createChatConfirm');
+            const createChatCancel = document.getElementById('createChatCancel');
+
             const sidebar = document.getElementById('sidebar');
             const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
             const newChatBtn = document.getElementById('newChatBtn');
@@ -1404,7 +1446,7 @@
                 emojiPanel.classList.toggle('hidden');
             });
 
-            // Закрытие панели при клике вне (упрощённо — при клике на другие элементы, но мы не реализуем сложную логику)
+            // Закрытие панели при клике вне
             document.addEventListener('click', (e) => {
                 if (!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) {
                     emojiPanel.classList.add('hidden');
@@ -1813,14 +1855,41 @@
                 }
             }
 
-            newChatBtn.addEventListener('click', () => {
-                const name = prompt('Введите название нового чата:');
-                if (!name || !name.trim()) return;
+            // ---------- Создание чата с выбором участников ----------
+            function openCreateChatModal() {
+                // Заполняем список пользователей (все кроме текущего)
+                const otherUsers = users.filter(u => u.name !== currentUser.name);
+                newChatUsersList.innerHTML = '';
+                otherUsers.forEach(user => {
+                    const div = document.createElement('div');
+                    div.className = 'user-checkbox-item';
+                    div.innerHTML = `
+                        <input type="checkbox" id="user_${user.name}" value="${user.name}">
+                        <label for="user_${user.name}">${user.name}</label>
+                    `;
+                    newChatUsersList.appendChild(div);
+                });
+                newChatNameInput.value = '';
+                createChatModal.classList.remove('hidden');
+            }
+
+            createChatConfirm.addEventListener('click', () => {
+                const chatName = newChatNameInput.value.trim();
+                if (!chatName) {
+                    alert('Введите название чата');
+                    return;
+                }
+                // Собираем выбранных пользователей
+                const selected = [];
+                document.querySelectorAll('#newChatUsersList input[type="checkbox"]:checked').forEach(cb => {
+                    selected.push(cb.value);
+                });
+                // Создаём новый чат
                 const newChat = {
                     id: 'chat_' + Date.now() + Math.random(),
-                    name: name.trim(),
+                    name: chatName,
                     createdBy: currentUser.name,
-                    members: [currentUser.name],
+                    members: [currentUser.name, ...selected],
                     avatar: null
                 };
                 chats.push(newChat);
@@ -1828,8 +1897,16 @@
                 saveData();
                 switchChat(newChat.id);
                 showToast('Чат создан', 'fa-check-circle');
+                createChatModal.classList.add('hidden');
             });
 
+            createChatCancel.addEventListener('click', () => {
+                createChatModal.classList.add('hidden');
+            });
+
+            newChatBtn.addEventListener('click', openCreateChatModal);
+
+            // Добавление участника в существующий чат (уже было, но улучшим)
             addMemberBtn.addEventListener('click', () => {
                 const chat = chats.find(c => c.id === currentChatId);
                 if (!chat) return;
